@@ -1,0 +1,41 @@
+name: PR49 MATLAB validation
+
+on:
+  push:
+    branches:
+      - validation/pr49-matlab
+
+jobs:
+  matlab-validation:
+    name: Run near and far profiles
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out validation branch
+        uses: actions/checkout@v6
+      - name: Set up MATLAB R2026a
+        uses: matlab-actions/setup-matlab@v3
+        with:
+          release: R2026a
+      - name: Run CTSAI-A100 MATLAB pipeline
+        uses: matlab-actions/run-command@v3
+        with:
+          command: >-
+            projectDir = fullfile(pwd, 'community', 'projects', 'a100-matlab-adc-pipeline-validation');
+            cd(projectDir);
+            nearDetections = main('near');
+            assert(height(nearDetections) == 32, 'Expected 32 near detections, got %d.', height(nearDetections));
+            farDetections = main('far');
+            assert(height(farDetections) == 3, 'Expected 3 far detections, got %d.', height(farDetections));
+            assert(all(~nearDetections.kinematics_valid));
+            assert(all(~farDetections.kinematics_valid));
+            assert(all(isnan(nearDetections.velocity_mps)) && all(isnan(nearDetections.angle_deg)));
+            assert(all(isnan(farDetections.velocity_mps)) && all(isnan(farDetections.angle_deg)));
+            disp('PR49 MATLAB VALIDATION PASSED');
+      - name: Upload MATLAB outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr49-matlab-results
+          path: community/projects/a100-matlab-adc-pipeline-validation/results/
+          if-no-files-found: warn
